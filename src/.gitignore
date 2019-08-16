@@ -1,0 +1,6 @@
+.work3
+*.o
+*.so
+platform.info
+.csmith
+*.pyc

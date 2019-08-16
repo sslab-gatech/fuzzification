@@ -1,0 +1,91 @@
+#include "llvm/ADT/Statistic.h"
+
+#include <llvm/CodeGen/MachineInstrBuilder.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetInstrInfo.h>
+
+#include "llvm/Pass.h"
+#include "llvm/IR/Function.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/CallSite.h"
+
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <unordered_map>
+#include <unistd.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+
+using namespace llvm;
+using namespace std;
+
+namespace {
+  struct SkeletonPass : public FunctionPass {
+    static char ID;
+
+    SkeletonPass() : FunctionPass(ID) {
+    }
+
+    virtual bool runOnFunction(Function &F) {
+
+      // Get the function to call from our runtime library.
+      LLVMContext &Ctx = F.getContext();
+      std::vector<Type*> paramTypes = {Type::getInt32Ty(Ctx)};
+      Type *retType = Type::getVoidTy(Ctx);
+      
+      
+      // slp (int)
+      std::vector<Type*> paramTypes3 = {Type::getInt32Ty(Ctx)};
+      FunctionType *uslpType = FunctionType::get(retType, paramTypes3, false);
+      Constant *uslpFunc = F.getParent()->getOrInsertFunction("slp", uslpType);
+
+      std::vector<Type*> paramTypes4 = {Type::getInt32Ty(Ctx)};
+      FunctionType *dummyType = FunctionType::get(retType, paramTypes4, false);
+      Constant *dummyFunc = F.getParent()->getOrInsertFunction("dummy", dummyType);
+
+      for (auto &B : F) {
+
+        BasicBlock::iterator i, e;
+        for (i = B.begin(), e = B.end(); i != e; ++i) {
+          Instruction* ii = &*i;
+          if (*ii->getOpcodeName() == 'r' && F.arg_size() > 0){
+            //errs() << *ii << "\n" ;
+            //errs() <<  F.arg_size() << "\n";
+
+            IRBuilder<> builder(ii);
+            builder.SetInsertPoint(&B, builder.GetInsertPoint());
+            Value* args[] = {ConstantInt::get(Type::getInt32Ty(Ctx), 2, false)};            
+            builder.CreateCall(dummyFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            builder.CreateCall(uslpFunc, args);
+            errs() << "Instrument this function" << "\n";          
+          }
+        }
+      }
+      return false;
+    }
+  };
+  //errs() << "Count: " << counter << "\n";
+}
+
+char SkeletonPass::ID = 0;
+static void registerSkeletonPass(const PassManagerBuilder &,
+                         legacy::PassManagerBase &PM) {
+  PM.add(new SkeletonPass());
+}
+static RegisterPass<SkeletonPass> X("SkeletonPass", "test", false, false);
